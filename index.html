@@ -1,34 +1,271 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>My First Page</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Bundela Bank (Demo)</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background-color: #f9f9f9;
-      margin: 20px;
-    }
-    h1 {
-      color: #333;
-    }
-    p {
-      font-size: 16px;
-      color: #555;
-    }
-    a {
-      color: blue;
-      text-decoration: none;
-    }
-    a:hover {
-      text-decoration: underline;
-    }
+    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial; max-width:900px; margin:24px auto; padding:0 12px; color:#111; }
+    header { display:flex; align-items:center; gap:12px; }
+    h1 { margin:0 0 8px 0; font-size:1.4rem; }
+    .card { border:1px solid #ddd; border-radius:8px; padding:12px; margin:12px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+    label { display:block; margin:8px 0 4px; font-weight:600; }
+    input[type="text"], input[type="number"] { width:100%; padding:8px; box-sizing:border-box; border:1px solid #ccc; border-radius:6px; }
+    .row { display:flex; gap:12px; }
+    .col { flex:1; }
+    button { padding:8px 12px; border-radius:6px; border:0; background:#0366d6; color:white; cursor:pointer; }
+    button.secondary { background:#6c757d; }
+    .small { font-size:0.9rem; color:#444; }
+    table { width:100%; border-collapse:collapse; margin-top:8px; }
+    th, td { padding:8px 6px; border-bottom:1px solid #eee; text-align:left; }
+    .msg { padding:8px; border-radius:6px; margin-top:8px; }
+    .error { background:#ffe8e8; color:#900; border:1px solid #f5c2c2; }
+    .success { background:#e7f9ee; color:#0a6; border:1px solid #bfeccf; }
+    .muted { color:#666; font-size:0.9rem; }
   </style>
 </head>
 <body>
-  <h1>Hello, World!</h1>
-  <p>This is my first HTML page.</p>
-  <p>Here’s a link to <a href="https://www.google.com" target="_blank">Google</a>.</p>
+  <header>
+    <h1>Bundela Bank — Demo</h1>
+    <div class="muted">In-memory accounts & transactions</div>
+  </header>
+
+  <div class="card">
+    <strong>Create account</strong>
+    <div style="margin-top:8px" class="row">
+      <div class="col">
+        <label>Account Number</label>
+        <input id="create-accno" type="number" placeholder="e.g. 12345" />
+      </div>
+      <div class="col">
+        <label>Name</label>
+        <input id="create-name" type="text" placeholder="Account holder name" />
+      </div>
+      <div class="col">
+        <label>Initial Balance</label>
+        <input id="create-balance" type="number" step="0.01" placeholder="0.00" />
+      </div>
+      <div style="align-self:end">
+        <button id="btn-create">Create</button>
+      </div>
+    </div>
+    <div id="create-msg" class="msg" style="display:none"></div>
+  </div>
+
+  <div class="card">
+    <strong>Deposit / Withdraw</strong>
+    <div class="row" style="margin-top:8px">
+      <div class="col">
+        <label>Account Number</label>
+        <input id="tx-accno" type="number" />
+      </div>
+      <div class="col">
+        <label>Amount</label>
+        <input id="tx-amount" type="number" step="0.01" />
+      </div>
+      <div style="display:flex; gap:8px; align-items:flex-end;">
+        <button id="btn-deposit">Deposit</button>
+        <button id="btn-withdraw" class="secondary">Withdraw</button>
+      </div>
+    </div>
+    <div id="tx-msg" class="msg" style="display:none"></div>
+  </div>
+
+  <div class="card">
+    <strong>View Account</strong>
+    <div style="margin-top:8px" class="row">
+      <div class="col">
+        <label>Account Number</label>
+        <input id="view-accno" type="number" />
+      </div>
+      <div style="align-self:end">
+        <button id="btn-view">View</button>
+      </div>
+    </div>
+
+    <div id="account-info" style="margin-top:12px; display:none;">
+      <h3 class="small">Account info</h3>
+      <div id="info-box" class="muted"></div>
+      <h3 class="small" style="margin-top:12px">Transaction History</h3>
+      <div id="history-box"></div>
+    </div>
+  </div>
+
+  <script>
+    // JS classes that mirror your C++ program
+    class TransactionHistory {
+      constructor() { this.records = []; }
+      firstDeposit(value) {
+        this.records.push({ deposit: value, withdrawn: 0, balance: value, time: new Date().toLocaleString() });
+      }
+      deposit(value, prevBalance) {
+        this.records.push({ deposit: value, withdrawn: 0, balance: prevBalance + value, time: new Date().toLocaleString() });
+      }
+      withdraw(value, prevBalance) {
+        this.records.push({ deposit: 0, withdrawn: value, balance: prevBalance - value, time: new Date().toLocaleString() });
+      }
+      list() { return this.records.slice(); }
+    }
+
+    class Account {
+      constructor(accno, name, initialBalance) {
+        this.accno = accno;
+        this.name = name;
+        this.balance = Number(initialBalance) || 0;
+        this.history = new TransactionHistory();
+        this.history.firstDeposit(this.balance);
+      }
+      deposit(amount) {
+        amount = Number(amount);
+        this.history.deposit(amount, this.balance);
+        this.balance += amount;
+      }
+      withdraw(amount) {
+        amount = Number(amount);
+        if (amount > this.balance) {
+          throw new Error("Insufficient balance");
+        }
+        this.history.withdraw(amount, this.balance);
+        this.balance -= amount;
+      }
+      getInfo() {
+        return {
+          accno: this.accno,
+          name: this.name,
+          balance: this.balance,
+          transactions: this.history.list()
+        };
+      }
+    }
+
+    class Bank {
+      constructor() {
+        this.accounts = new Map(); // accno -> Account
+      }
+      createAccount(accno, name, initialBalance) {
+        if (this.accounts.has(accno)) throw new Error("Account already exists");
+        const acc = new Account(accno, name, initialBalance);
+        this.accounts.set(accno, acc);
+        return acc;
+      }
+      getAccount(accno) {
+        return this.accounts.get(accno) || null;
+      }
+      deposit(accno, amount) {
+        const a = this.getAccount(accno);
+        if (!a) throw new Error("Account not found");
+        a.deposit(amount);
+        return a;
+      }
+      withdraw(accno, amount) {
+        const a = this.getAccount(accno);
+        if (!a) throw new Error("Account not found");
+        a.withdraw(amount);
+        return a;
+      }
+    }
+
+    // Application logic
+    const bank = new Bank();
+
+    // DOM refs
+    const createAccno = document.getElementById('create-accno');
+    const createName = document.getElementById('create-name');
+    const createBalance = document.getElementById('create-balance');
+    const btnCreate = document.getElementById('btn-create');
+    const createMsg = document.getElementById('create-msg');
+
+    const txAccno = document.getElementById('tx-accno');
+    const txAmount = document.getElementById('tx-amount');
+    const btnDeposit = document.getElementById('btn-deposit');
+    const btnWithdraw = document.getElementById('btn-withdraw');
+    const txMsg = document.getElementById('tx-msg');
+
+    const viewAccno = document.getElementById('view-accno');
+    const btnView = document.getElementById('btn-view');
+    const accountInfo = document.getElementById('account-info');
+    const infoBox = document.getElementById('info-box');
+    const historyBox = document.getElementById('history-box');
+
+    function showMessage(el, text, type='success') {
+      el.style.display = 'block';
+      el.className = 'msg ' + (type === 'error' ? 'error' : 'success');
+      el.textContent = text;
+      setTimeout(()=> { el.style.display = 'none'; }, 4000);
+    }
+
+    btnCreate.addEventListener('click', () => {
+      const accno = Number(createAccno.value);
+      const name = createName.value.trim();
+      const bal = Number(createBalance.value || 0);
+      if (!accno || !name) {
+        showMessage(createMsg, 'Provide valid account number & name', 'error');
+        return;
+      }
+      try {
+        bank.createAccount(accno, name, bal);
+        showMessage(createMsg, `Account ${accno} created for ${name} with balance ₹${bal.toFixed(2)}`, 'success');
+        createAccno.value = createName.value = createBalance.value = '';
+      } catch (err) {
+        showMessage(createMsg, err.message, 'error');
+      }
+    });
+
+    btnDeposit.addEventListener('click', () => {
+      const accno = Number(txAccno.value);
+      const amt = Number(txAmount.value);
+      if (!accno || !amt || amt <= 0) { showMessage(txMsg, 'Enter valid account number and amount', 'error'); return; }
+      try {
+        const acc = bank.deposit(accno, amt);
+        showMessage(txMsg, `Deposited ₹${amt.toFixed(2)} to ${accno}. New balance ₹${acc.balance.toFixed(2)}`, 'success');
+      } catch (err) { showMessage(txMsg, err.message, 'error'); }
+    });
+
+    btnWithdraw.addEventListener('click', () => {
+      const accno = Number(txAccno.value);
+      const amt = Number(txAmount.value);
+      if (!accno || !amt || amt <= 0) { showMessage(txMsg, 'Enter valid account number and amount', 'error'); return; }
+      try {
+        const acc = bank.withdraw(accno, amt);
+        showMessage(txMsg, `Withdrew ₹${amt.toFixed(2)} from ${accno}. New balance ₹${acc.balance.toFixed(2)}`, 'success');
+      } catch (err) {
+        showMessage(txMsg, err.message, 'error');
+      }
+    });
+
+    btnView.addEventListener('click', () => {
+      const accno = Number(viewAccno.value);
+      if (!accno) { alert('Enter account number'); return; }
+      const acc = bank.getAccount(accno);
+      if (!acc) { alert('Account not found'); accountInfo.style.display='none'; return; }
+      const info = acc.getInfo();
+      accountInfo.style.display = 'block';
+      infoBox.innerHTML = `
+        <div><strong>Account #</strong> ${info.accno}</div>
+        <div><strong>Name</strong> ${info.name}</div>
+        <div><strong>Balance</strong> ₹${info.balance.toFixed(2)}</div>
+      `;
+      // render history
+      if (info.transactions.length === 0) {
+        historyBox.innerHTML = `<div class="muted">No transactions</div>`;
+      } else {
+        let html = `<table><thead><tr><th>Time</th><th>Deposit</th><th>Withdrawn</th><th>Balance</th></tr></thead><tbody>`;
+        for (const r of info.transactions) {
+          html += `<tr>
+            <td>${r.time}</td>
+            <td>₹${Number(r.deposit).toFixed(2)}</td>
+            <td>₹${Number(r.withdrawn).toFixed(2)}</td>
+            <td>₹${Number(r.balance).toFixed(2)}</td>
+          </tr>`;
+        }
+        html += `</tbody></table>`;
+        historyBox.innerHTML = html;
+      }
+    });
+
+    // Optional: prefill some data for faster testing (uncomment if you want)
+    // bank.createAccount(101, 'Alice', 1000);
+    // bank.createAccount(102, 'Bob', 500);
+  </script>
 </body>
 </html>
